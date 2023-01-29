@@ -29,3 +29,21 @@ func (s SDK) GetUpdateInfo() (*UpdateInfo, error) {
 
 	return updateInfo, nil
 }
+
+func (s SDK) DownloadUpdate() (string, error) {
+	updateInfo, err := s.updateChecker.GetLatestVersion(s.version)
+	if err != nil {
+		return "", errors.Wrap(err, "get latest version")
+	}
+
+	if updateInfo == nil {
+		return "", errors.New("no update info")
+	}
+
+	tmpFile, err := s.updateChecker.DownloadVersion(updateInfo.LatestVersion)
+	if err != nil {
+		return "", errors.Wrap(err, "download version")
+	}
+
+	return tmpFile, nil
+}
