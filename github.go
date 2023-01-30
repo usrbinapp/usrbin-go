@@ -181,25 +181,23 @@ func findProbableFileInGzip(path string) (string, error) {
 			// if the file is executable and matches the name of the current process
 			// then it's almost certainly the file we want
 
-			if header.Mode&0111 != 0 {
-				if filepath.Base(os.Args[0]) == filepath.Base(header.Name) {
-					tmpFile, err := ioutil.TempFile("", "usrbin")
-					if err != nil {
-						return "", errors.Wrap(err, "create temp file")
-					}
-
-					defer tmpFile.Close()
-					if _, err := io.Copy(tmpFile, tr); err != nil {
-						log.Fatalf("ExtractTarGz: Copy() failed: %s", err.Error())
-					}
-
-					// set the mode on the file to match
-					if err := os.Chmod(tmpFile.Name(), os.FileMode(header.Mode)); err != nil {
-						return "", errors.Wrap(err, "set file mode")
-					}
-
-					return tmpFile.Name(), nil
+			if isLikelyFile(header.Mode, header.Name, filepath.Base(os.Args[0])) {
+				tmpFile, err := ioutil.TempFile("", "usrbin")
+				if err != nil {
+					return "", errors.Wrap(err, "create temp file")
 				}
+
+				defer tmpFile.Close()
+				if _, err := io.Copy(tmpFile, tr); err != nil {
+					log.Fatalf("ExtractTarGz: Copy() failed: %s", err.Error())
+				}
+
+				// set the mode on the file to match
+				if err := os.Chmod(tmpFile.Name(), os.FileMode(header.Mode)); err != nil {
+					return "", errors.Wrap(err, "set file mode")
+				}
+
+				return tmpFile.Name(), nil
 			}
 		}
 	}
@@ -207,31 +205,29 @@ func findProbableFileInGzip(path string) (string, error) {
 	return "", errors.New("unable to find matching file in archive")
 }
 
-func (c GitHubUpdateChecker) GetLatestVersion(currentVersion string) (*UpdateInfo, error) {
-	checkedAt := time.Now()
+func isLikelyFile(mode int64, name string, currentExecutableName string) bool {
+	if mode&0111 != 0 {
+		if currentExecutableName == filepath.Base(name) {
+			return true
+		}
+	}
 
+	return false
+}
+
+// GetLatestVersion will return the latest version from the git repository
+func (c GitHubUpdateChecker) GetLatestVersion() (*VersionInfo, error) {
 	latestReleaseInfo, err := getReleaseDetails(c.host, c.apiToken, c.parsedRepo.owner, c.parsedRepo.repo, "latest")
 	if err != nil {
 		return nil, errors.Wrap(err, "get release details")
 	}
 
-	currentReleaseInfo, err := getReleaseDetails(c.host, c.apiToken, c.parsedRepo.owner, c.parsedRepo.repo, currentVersion)
-	if err != nil && err != ErrReleaseNotFound {
-		return nil, errors.Wrap(err, "get release details")
+	latestVersion := &VersionInfo{
+		Version:    latestReleaseInfo.TagName,
+		ReleasedAt: latestReleaseInfo.PublishedAt,
 	}
 
-	updateInfo := UpdateInfo{
-		LatestVersion:   latestReleaseInfo.TagName,
-		LatestReleaseAt: &latestReleaseInfo.PublishedAt,
-		CheckedAt:       &checkedAt,
-	}
-
-	if currentReleaseInfo != nil {
-		updateInfo.VersionsBehind = nil
-		updateInfo.AbsoluteVersionAgeDays = nil
-	}
-
-	return &updateInfo, nil
+	return latestVersion, nil
 }
 
 func getReleaseDetails(host string, token string, owner string, repo string, releaseName string) (*gitHubReleaseInfo, error) {
