@@ -7,7 +7,7 @@ import (
 
 type UpdateChecker interface {
 	GetLatestVersion() (*VersionInfo, error)
-	DownloadVersion(version string) (string, error)
+	DownloadVersion(version string, requireChecksumMatch bool) (string, error)
 }
 
 var _ UpdateChecker = (*GitHubUpdateChecker)(nil)

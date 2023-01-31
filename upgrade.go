@@ -49,7 +49,7 @@ func (s SDK) Upgrade() error {
 		return errors.New("no update info")
 	}
 
-	newVersionPath, err := s.updateChecker.DownloadVersion(updateInfo.LatestVersion)
+	newVersionPath, err := s.updateChecker.DownloadVersion(updateInfo.LatestVersion, true)
 	if err != nil {
 		return errors.Wrap(err, "download version")
 	}

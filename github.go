@@ -2,6 +2,7 @@ package usrbin
 
 import (
 	"archive/tar"
+	"bufio"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -19,9 +20,11 @@ import (
 )
 
 var (
-	ErrUnknownArchiveType      = errors.New("unknown archive type")
-	ErrNoMatchingArchitectures = errors.New("no matching architectures")
-	ErrNoAssets                = errors.New("no assets")
+	ErrUnknownArchiveType        = errors.New("unknown archive type")
+	ErrNoMatchingArchitectures   = errors.New("no matching architectures")
+	ErrNoAssets                  = errors.New("no assets")
+	ErrChecksumMismatch          = errors.New("checksum mismatch")
+	ErrUnsupportedChecksumFormat = errors.New("unsupported checksum format")
 )
 
 type GitHubUpdateChecker struct {
@@ -81,28 +84,116 @@ func NewGitHubUpdateChecker(fqRepo string) UpdateChecker {
 // DownloadVersion will download and extract the specific version, returning
 // a path to the extracted file in the archive
 // it's the responsibility of the caller to clean up the extracted file
-func (c GitHubUpdateChecker) DownloadVersion(version string) (string, error) {
+func (c GitHubUpdateChecker) DownloadVersion(version string, requireChecksumMatch bool) (string, error) {
 	releaseInfo, err := getReleaseDetails(c.host, c.parsedRepo.owner, c.parsedRepo.repo, version)
 	if err != nil {
 		return "", errors.Wrap(err, "get release details")
 	}
 
-	downloadURL, err := bestAsset(releaseInfo.Assets, runtime.GOOS, runtime.GOARCH)
+	asset, err := bestAsset(releaseInfo.Assets, runtime.GOOS, runtime.GOARCH)
 	if err != nil {
 		return "", errors.Wrap(err, "best asset")
 	}
 
-	archivePath, err := downloadFile(downloadURL)
+	archivePath, err := downloadFile(asset.BrowserDownloadURL)
 	if err != nil {
 		return "", errors.Wrap(err, "download file")
+	}
+
+	checksumAsset, err := checksum(releaseInfo.Assets, asset.Name)
+	if err != nil {
+		return "", errors.Wrap(err, "checksum")
+	}
+
+	if checksumAsset != nil {
+		desiredChecksum, err := downloadAndParseChecksum(checksumAsset.BrowserDownloadURL, asset.Name)
+		if err != nil {
+			return "", errors.Wrap(err, "download and parse checksum")
+		}
+
+		actualChecksum, err := checksumFile(archivePath)
+		if err != nil {
+			return "", errors.Wrap(err, "checksum file")
+		}
+
+		if actualChecksum != desiredChecksum {
+			return "", ErrChecksumMismatch
+		}
 	}
 
 	return archivePath, nil
 }
 
-func bestAsset(assets []githubAsset, goos string, goarch string) (string, error) {
+func downloadAndParseChecksum(url string, assetName string) (string, error) {
+	// download the file
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	// parse the file
+	// supported formats are sha256[whitespace]filepath per line
+
+	// first try to find the exact match
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Split(line, " ")
+		if len(parts) == 2 {
+			if strings.HasSuffix(strings.TrimSpace(parts[1]), assetName) {
+				return strings.TrimSpace(parts[0]), nil
+			}
+		}
+	}
+
+	return "", ErrUnsupportedChecksumFormat
+}
+
+func checksumFile(path string) (string, error) {
+	return "", nil
+}
+
+// checksumAsset will search through the assets and attempt to find the
+// download url for the sha256 checksum for the asset provided
+// this works by looking for the asset name with the checksum appended to it
+// it will return empty string and no error if there is not checksum
+func checksum(assets []githubAsset, assetName string) (*githubAsset, error) {
+	for _, asset := range assets {
+		if asset.State != "uploaded" {
+			continue
+		}
+
+		if strings.HasPrefix(asset.Name, assetName) {
+			if strings.HasSuffix(asset.Name, ".sha256") {
+				return &asset, nil
+			}
+		}
+	}
+
+	// no exact match, look for a common checksums file
+	for _, asset := range assets {
+		if asset.State != "uploaded" {
+			continue
+		}
+
+		if strings.Contains(asset.Name, "checksums") {
+			if strings.HasSuffix(asset.Name, ".txt") {
+				return &asset, nil
+			}
+		}
+	}
+
+	return nil, nil
+}
+
+// bestAsset will search through the assets, find the best (most appropriate)
+// asset for the os nad arch provided. this will that asset
+// for the asset
+func bestAsset(assets []githubAsset, goos string, goarch string) (*githubAsset, error) {
 	if len(assets) == 0 {
-		return "", ErrNoAssets
+		return nil, ErrNoAssets
 	}
 
 	// find the most appropriate asset
@@ -114,7 +205,7 @@ func bestAsset(assets []githubAsset, goos string, goarch string) (string, error)
 		lowercaseName := strings.ToLower(asset.Name)
 		if strings.Contains(lowercaseName, goos) {
 			if strings.Contains(lowercaseName, goarch) {
-				return asset.BrowserDownloadURL, nil
+				return &asset, nil
 			}
 		}
 	}
@@ -128,12 +219,12 @@ func bestAsset(assets []githubAsset, goos string, goarch string) (string, error)
 		lowercaseName := strings.ToLower(asset.Name)
 		if strings.Contains(lowercaseName, runtime.GOOS) {
 			if strings.Contains(lowercaseName, "all") {
-				return asset.BrowserDownloadURL, nil
+				return &asset, nil
 			}
 		}
 	}
 
-	return "", ErrNoMatchingArchitectures
+	return nil, ErrNoMatchingArchitectures
 }
 
 func downloadFile(url string) (string, error) {

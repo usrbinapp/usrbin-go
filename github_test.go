@@ -88,12 +88,12 @@ func Test_bestAsset(t *testing.T) {
 		assets  []githubAsset
 		goos    string
 		goarch  string
-		want    string
+		want    *githubAsset
 		wantErr error
 	}{
 		{
 			name:    "no assets",
-			want:    "",
+			want:    nil,
 			wantErr: ErrNoAssets,
 		},
 		{
@@ -107,7 +107,11 @@ func Test_bestAsset(t *testing.T) {
 			},
 			goos:   "linux",
 			goarch: "amd64",
-			want:   "https://usrbin.app/foo_linux_amd64",
+			want: &githubAsset{
+				Name:               "foo_linux_amd64",
+				State:              "uploaded",
+				BrowserDownloadURL: "https://usrbin.app/foo_linux_amd64",
+			},
 		},
 		{
 			name: "multiple assets, one matching",
@@ -135,7 +139,11 @@ func Test_bestAsset(t *testing.T) {
 			},
 			goos:   "linux",
 			goarch: "amd64",
-			want:   "https://usrbin.app/foo_linux_amd64",
+			want: &githubAsset{
+				Name:               "foo_linux_amd64",
+				State:              "uploaded",
+				BrowserDownloadURL: "https://usrbin.app/foo_linux_amd64",
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -148,6 +156,75 @@ func Test_bestAsset(t *testing.T) {
 			} else {
 				assert.EqualError(t, err, tt.wantErr.Error())
 			}
+		})
+	}
+}
+
+func Test_checksum(t *testing.T) {
+	tests := []struct {
+		name   string
+		assets []githubAsset
+		asset  githubAsset
+		want   *githubAsset
+	}{
+		{
+			name: "goreleaser style",
+			assets: []githubAsset{
+				{
+					Name:  "cli_0.1.0_checksums.txt",
+					State: "uploaded",
+				},
+				{
+					Name:  "foo_linux_amd64.tar.gz",
+					State: "uploaded",
+				},
+				{
+					Name:  "foo_darwin_amd64.tar.gz",
+					State: "uploaded",
+				},
+				{
+					Name:  "foo_windows_all.tar.gz",
+					State: "uploaded",
+				},
+			},
+			asset: githubAsset{
+				Name: "foo_linux_amd64.tar.gz",
+			},
+			want: &githubAsset{
+				Name:  "cli_0.1.0_checksums.txt",
+				State: "uploaded",
+			},
+		},
+		{
+			name: "with .sha256 extension",
+			assets: []githubAsset{
+				{
+					Name:  "foo_linux_amd64.sha256",
+					State: "uploaded",
+				},
+				{
+					Name:  "foo_linux_amd64",
+					State: "uploaded",
+				},
+			},
+			asset: githubAsset{
+				Name:  "foo_linux_amd64",
+				State: "uploaded",
+			},
+			want: &githubAsset{
+				Name:  "foo_linux_amd64.sha256",
+				State: "uploaded",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := require.New(t)
+
+			got, err := checksum(tt.assets, tt.asset.Name)
+			req.NoError(err)
+
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
