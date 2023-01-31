@@ -27,8 +27,7 @@ var (
 type GitHubUpdateChecker struct {
 	repo string
 
-	host     string
-	apiToken string
+	host string
 
 	parsedRepo struct {
 		owner string
@@ -67,9 +66,8 @@ func NewGitHubUpdateChecker(fqRepo string) UpdateChecker {
 	}
 
 	return GitHubUpdateChecker{
-		repo:     repo,
-		host:     host,
-		apiToken: os.Getenv("GITHUB_TOKEN"),
+		repo: repo,
+		host: host,
 		parsedRepo: struct {
 			owner string
 			repo  string
@@ -84,7 +82,7 @@ func NewGitHubUpdateChecker(fqRepo string) UpdateChecker {
 // a path to the extracted file in the archive
 // it's the responsibility of the caller to clean up the extracted file
 func (c GitHubUpdateChecker) DownloadVersion(version string) (string, error) {
-	releaseInfo, err := getReleaseDetails(c.host, c.apiToken, c.parsedRepo.owner, c.parsedRepo.repo, version)
+	releaseInfo, err := getReleaseDetails(c.host, c.parsedRepo.owner, c.parsedRepo.repo, version)
 	if err != nil {
 		return "", errors.Wrap(err, "get release details")
 	}
@@ -239,7 +237,7 @@ func isLikelyFile(mode int64, name string, currentExecutableName string) bool {
 
 // GetLatestVersion will return the latest version from the git repository
 func (c GitHubUpdateChecker) GetLatestVersion() (*VersionInfo, error) {
-	latestReleaseInfo, err := getReleaseDetails(c.host, c.apiToken, c.parsedRepo.owner, c.parsedRepo.repo, "latest")
+	latestReleaseInfo, err := getReleaseDetails(c.host, c.parsedRepo.owner, c.parsedRepo.repo, "latest")
 	if err != nil {
 		return nil, errors.Wrap(err, "get release details")
 	}
@@ -252,7 +250,7 @@ func (c GitHubUpdateChecker) GetLatestVersion() (*VersionInfo, error) {
 	return latestVersion, nil
 }
 
-func getReleaseDetails(host string, token string, owner string, repo string, releaseName string) (*gitHubReleaseInfo, error) {
+func getReleaseDetails(host string, owner string, repo string, releaseName string) (*gitHubReleaseInfo, error) {
 	uri := ""
 
 	if releaseName == "latest" {
@@ -264,10 +262,6 @@ func getReleaseDetails(host string, token string, owner string, repo string, rel
 	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "new request")
-	}
-
-	if token != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	}
 
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
