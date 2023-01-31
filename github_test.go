@@ -1,32 +1,44 @@
 package usrbin
 
 import (
+	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_findProbableFileInWhatMightBeAnArchive(t *testing.T) {
-	type args struct {
-		path string
-	}
 	tests := []struct {
 		name    string
-		args    args
+		content string
 		want    string
-		wantErr bool
+		wantErr error
 	}{
-		// TODO: Add test cases.
+		{
+			name:    "not an archive file",
+			content: "",
+			want:    "",
+			wantErr: ErrUnknownArchiveType,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := findProbableFileInWhatMightBeAnArchive(tt.args.path)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("findProbableFileInWhatMightBeAnArchive() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("findProbableFileInWhatMightBeAnArchive() = %v, want %v", got, tt.want)
+			tmp, err := ioutil.TempFile("", "test")
+			require.NoError(t, err)
+			defer tmp.Close()
+
+			_, err = tmp.Write([]byte(tt.content))
+			require.NoError(t, err)
+
+			req := require.New(t)
+
+			got, err := findProbableFileInWhatMightBeAnArchive(tmp.Name())
+			if tt.wantErr == nil {
+				req.NoError(err)
+				assert.Equal(t, tt.want, got)
+			} else {
+				assert.EqualError(t, err, tt.wantErr.Error())
 			}
 		})
 	}
@@ -66,6 +78,76 @@ func Test_isLikelyFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := isLikelyFile(tt.mode, tt.filename, tt.currentExecutableName)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_bestAsset(t *testing.T) {
+	tests := []struct {
+		name    string
+		assets  []githubAsset
+		goos    string
+		goarch  string
+		want    string
+		wantErr error
+	}{
+		{
+			name:    "no assets",
+			want:    "",
+			wantErr: ErrNoAssets,
+		},
+		{
+			name: "one asset",
+			assets: []githubAsset{
+				{
+					Name:               "foo_linux_amd64",
+					State:              "uploaded",
+					BrowserDownloadURL: "https://usrbin.app/foo_linux_amd64",
+				},
+			},
+			goos:   "linux",
+			goarch: "amd64",
+			want:   "https://usrbin.app/foo_linux_amd64",
+		},
+		{
+			name: "multiple assets, one matching",
+			assets: []githubAsset{
+				{
+					Name:               "foo_darwin_amd64",
+					State:              "uploaded",
+					BrowserDownloadURL: "https://usrbin.app/foo_darwin_amd64",
+				},
+				{
+					Name:               "foo_linux_arm64",
+					State:              "uploaded",
+					BrowserDownloadURL: "https://usrbin.app/foo_linux_arm64",
+				},
+				{
+					Name:               "foo_linux_amd64",
+					State:              "uploaded",
+					BrowserDownloadURL: "https://usrbin.app/foo_linux_amd64",
+				},
+				{
+					Name:               "checksums.txt",
+					State:              "uploaded",
+					BrowserDownloadURL: "https://usrbin.app/checksums.txt",
+				},
+			},
+			goos:   "linux",
+			goarch: "amd64",
+			want:   "https://usrbin.app/foo_linux_amd64",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := require.New(t)
+			got, err := bestAsset(tt.assets, tt.goos, tt.goarch)
+			if tt.wantErr == nil {
+				req.NoError(err)
+				assert.Equal(t, tt.want, got)
+			} else {
+				assert.EqualError(t, err, tt.wantErr.Error())
+			}
 		})
 	}
 }

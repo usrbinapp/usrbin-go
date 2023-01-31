@@ -18,6 +18,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+var (
+	ErrUnknownArchiveType      = errors.New("unknown archive type")
+	ErrNoMatchingArchitectures = errors.New("no matching architectures")
+	ErrNoAssets                = errors.New("no assets")
+)
+
 type GitHubUpdateChecker struct {
 	repo string
 
@@ -30,16 +36,18 @@ type GitHubUpdateChecker struct {
 	}
 }
 
+type githubAsset struct {
+	Name               string `json:"name"`
+	ContentType        string `json:"content_type"`
+	State              string `json:"state"`
+	Size               int    `json:"size"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+}
+
 type gitHubReleaseInfo struct {
-	TagName     string    `json:"tag_name"`
-	PublishedAt time.Time `json:"published_at"`
-	Assets      []struct {
-		Name               string `json:"name"`
-		ContentType        string `json:"content_type"`
-		State              string `json:"state"`
-		Size               int    `json:"size"`
-		BrowserDownloadURL string `json:"browser_download_url"`
-	} `json:"assets"`
+	TagName     string        `json:"tag_name"`
+	PublishedAt time.Time     `json:"published_at"`
+	Assets      []githubAsset `json:"assets"`
 }
 
 var ErrReleaseNotFound = errors.New("release not found")
@@ -81,26 +89,40 @@ func (c GitHubUpdateChecker) DownloadVersion(version string) (string, error) {
 		return "", errors.Wrap(err, "get release details")
 	}
 
-	if len(releaseInfo.Assets) == 0 {
-		return "", errors.New("no assets found")
+	downloadURL, err := bestAsset(releaseInfo.Assets, runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		return "", errors.Wrap(err, "best asset")
+	}
+
+	archivePath, err := downloadFile(downloadURL)
+	if err != nil {
+		return "", errors.Wrap(err, "download file")
+	}
+
+	return archivePath, nil
+}
+
+func bestAsset(assets []githubAsset, goos string, goarch string) (string, error) {
+	if len(assets) == 0 {
+		return "", ErrNoAssets
 	}
 
 	// find the most appropriate asset
-	for _, asset := range releaseInfo.Assets {
+	for _, asset := range assets {
 		if asset.State != "uploaded" {
 			continue
 		}
 
 		lowercaseName := strings.ToLower(asset.Name)
-		if strings.Contains(lowercaseName, runtime.GOOS) {
-			if strings.Contains(lowercaseName, runtime.GOARCH) {
-				return downloadFile(asset.BrowserDownloadURL)
+		if strings.Contains(lowercaseName, goos) {
+			if strings.Contains(lowercaseName, goarch) {
+				return asset.BrowserDownloadURL, nil
 			}
 		}
 	}
 
 	// we didn't find a specific match, look for the os with "all" for the arch
-	for _, asset := range releaseInfo.Assets {
+	for _, asset := range assets {
 		if asset.State != "uploaded" {
 			continue
 		}
@@ -108,12 +130,12 @@ func (c GitHubUpdateChecker) DownloadVersion(version string) (string, error) {
 		lowercaseName := strings.ToLower(asset.Name)
 		if strings.Contains(lowercaseName, runtime.GOOS) {
 			if strings.Contains(lowercaseName, "all") {
-				return downloadFile(asset.BrowserDownloadURL)
+				return asset.BrowserDownloadURL, nil
 			}
 		}
 	}
 
-	return "", errors.New("unable to find file matching architecture")
+	return "", ErrNoMatchingArchitectures
 }
 
 func downloadFile(url string) (string, error) {
@@ -151,7 +173,7 @@ func findProbableFileInWhatMightBeAnArchive(path string) (string, error) {
 		return findProbableFileInGzip(path)
 	}
 
-	return "", errors.New("unable to determine file type of archive")
+	return "", ErrUnknownArchiveType
 }
 
 func findProbableFileInGzip(path string) (string, error) {
