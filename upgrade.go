@@ -5,6 +5,7 @@ import (
 
 	"github.com/minio/selfupdate"
 	"github.com/pkg/errors"
+	"github.com/usrbinapp/usrbin-go/pkg/logger"
 )
 
 // CanSupportUpgrade
@@ -58,7 +59,11 @@ func (s SDK) Upgrade() error {
 	if err != nil {
 		return errors.Wrap(err, "open new version")
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			logger.Error(err)
+		}
+	}()
 
 	err = selfupdate.Apply(f, selfupdate.Options{})
 	if err != nil {

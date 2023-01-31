@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/usrbinapp/usrbin-go/pkg/logger"
 )
 
 var (
@@ -254,7 +254,12 @@ func findProbableFileInWhatMightBeAnArchive(path string) (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "open file")
 	}
-	defer f.Close()
+
+	defer func() {
+		if err := f.Close(); err != nil {
+			logger.Error(err)
+		}
+	}()
 
 	// check if it's a gzip file
 	_, err = gzip.NewReader(f)
@@ -270,7 +275,12 @@ func findProbableFileInGzip(path string) (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "open file")
 	}
-	defer f.Close()
+
+	defer func() {
+		if err := f.Close(); err != nil {
+			logger.Error(err)
+		}
+	}()
 
 	gzr, err := gzip.NewReader(f)
 	if err != nil {
@@ -298,9 +308,14 @@ func findProbableFileInGzip(path string) (string, error) {
 					return "", errors.Wrap(err, "create temp file")
 				}
 
-				defer tmpFile.Close()
+				defer func() {
+					if err := tmpFile.Close(); err != nil {
+						logger.Error(err)
+					}
+				}()
+
 				if _, err := io.Copy(tmpFile, tr); err != nil {
-					log.Fatalf("ExtractTarGz: Copy() failed: %s", err.Error())
+					return "", errors.Wrap(err, "copy file")
 				}
 
 				// set the mode on the file to match
