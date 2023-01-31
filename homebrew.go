@@ -43,6 +43,12 @@ func (m HomebrewExternalPackageManager) IsInstalled() (bool, error) {
 		"--json",
 	).Output()
 	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			if exitError.ExitCode() == 1 {
+				// brew info with an invalid (not installed) package name returns an error
+				return false, nil
+			}
+		}
 		return false, errors.Wrap(err, "exec brew")
 	}
 
