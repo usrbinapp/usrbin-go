@@ -37,6 +37,9 @@ func (s SDK) GetUpdateInfo() (*UpdateInfo, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "update info from versions")
 	}
+	if updateInfo == nil {
+		return nil, nil
+	}
 
 	updateInfo.CheckedAt = &checkedAt
 
