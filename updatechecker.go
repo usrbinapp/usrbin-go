@@ -36,7 +36,5 @@ func updateInfoFromVersions(currentVersion string, latestVersion *VersionInfo) (
 		LatestReleaseAt: latestVersion.ReleasedAt,
 	}
 
-	updateInfo.CanUpgradeInPlace = true
-
 	return &updateInfo, nil
 }

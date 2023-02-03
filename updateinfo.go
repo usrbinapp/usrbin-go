@@ -17,7 +17,8 @@ type UpdateInfo struct {
 
 	CheckedAt *time.Time `json:"checkedAt"`
 
-	CanUpgradeInPlace bool `json:"canUpgradeInPlace"`
+	CanUpgradeInPlace      bool   `json:"canUpgradeInPlace"`
+	ExternalUpgradeCommand string `json:"externalUpgradeCommand"`
 }
 
 // GetUpdateInfo will return the latest version
@@ -41,6 +42,8 @@ func (s SDK) GetUpdateInfo() (*UpdateInfo, error) {
 		return nil, nil
 	}
 
+	updateInfo.ExternalUpgradeCommand = s.ExternalUpgradeCommand()
+	updateInfo.CanUpgradeInPlace = updateInfo.ExternalUpgradeCommand == ""
 	updateInfo.CheckedAt = &checkedAt
 
 	return updateInfo, nil
