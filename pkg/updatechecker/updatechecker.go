@@ -8,13 +8,13 @@ import (
 )
 
 type VersionInfo struct {
-	Version    string    `json:"version"`
-	ReleasedAt time.Time `json:"releasedAt"`
+	Version    string     `json:"version"`
+	ReleasedAt *time.Time `json:"releasedAt"`
 }
 
 type UpdateInfo struct {
-	LatestVersion   string    `json:"latestVersion"`
-	LatestReleaseAt time.Time `json:"latestReleaseAt"`
+	LatestVersion   string     `json:"latestVersion"`
+	LatestReleaseAt *time.Time `json:"latestReleaseAt"`
 
 	CheckedAt *time.Time `json:"checkedAt"`
 

@@ -136,7 +136,7 @@ func (c GitHubUpdateChecker) GetLatestVersion() (*updatechecker.VersionInfo, err
 
 	latestVersion := &updatechecker.VersionInfo{
 		Version:    latestReleaseInfo.TagName,
-		ReleasedAt: latestReleaseInfo.PublishedAt,
+		ReleasedAt: &latestReleaseInfo.PublishedAt,
 	}
 
 	return latestVersion, nil
