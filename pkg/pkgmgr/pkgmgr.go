@@ -1,8 +1,6 @@
-package usrbin
+package pkgmgr
 
 type ExternalPackageManager interface {
 	IsInstalled() (bool, error)
 	UpgradeCommand() string
 }
-
-var _ ExternalPackageManager = (*HomebrewExternalPackageManager)(nil)

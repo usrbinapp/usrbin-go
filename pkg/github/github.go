@@ -1,4 +1,4 @@
-package usrbin
+package github
 
 import (
 	"archive/tar"
@@ -17,6 +17,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/usrbinapp/usrbin-go/pkg/logger"
+	"github.com/usrbinapp/usrbin-go/pkg/updatechecker"
 )
 
 var (
@@ -38,6 +39,8 @@ type GitHubUpdateChecker struct {
 	}
 }
 
+var _ updatechecker.UpdateChecker = (*GitHubUpdateChecker)(nil)
+
 type githubAsset struct {
 	Name               string `json:"name"`
 	ContentType        string `json:"content_type"`
@@ -54,7 +57,7 @@ type gitHubReleaseInfo struct {
 
 var ErrReleaseNotFound = errors.New("release not found")
 
-func NewGitHubUpdateChecker(fqRepo string) UpdateChecker {
+func NewGitHubUpdateChecker(fqRepo string) updatechecker.UpdateChecker {
 	host := "https://api.github.com"
 	owner, repo := "", ""
 	repoParts := strings.Split(fqRepo, "/")
@@ -122,6 +125,21 @@ func (c GitHubUpdateChecker) DownloadVersion(version string, requireChecksumMatc
 	}
 
 	return archivePath, nil
+}
+
+// GetLatestVersion will return the latest version information from the git repository
+func (c GitHubUpdateChecker) GetLatestVersion() (*updatechecker.VersionInfo, error) {
+	latestReleaseInfo, err := getReleaseDetails(c.host, c.parsedRepo.owner, c.parsedRepo.repo, "latest")
+	if err != nil {
+		return nil, errors.Wrap(err, "get release details")
+	}
+
+	latestVersion := &updatechecker.VersionInfo{
+		Version:    latestReleaseInfo.TagName,
+		ReleasedAt: latestReleaseInfo.PublishedAt,
+	}
+
+	return latestVersion, nil
 }
 
 func downloadAndParseChecksum(url string, assetName string) (string, error) {
@@ -339,21 +357,6 @@ func isLikelyFile(mode int64, name string, currentExecutableName string) bool {
 	}
 
 	return false
-}
-
-// GetLatestVersion will return the latest version from the git repository
-func (c GitHubUpdateChecker) GetLatestVersion() (*VersionInfo, error) {
-	latestReleaseInfo, err := getReleaseDetails(c.host, c.parsedRepo.owner, c.parsedRepo.repo, "latest")
-	if err != nil {
-		return nil, errors.Wrap(err, "get release details")
-	}
-
-	latestVersion := &VersionInfo{
-		Version:    latestReleaseInfo.TagName,
-		ReleasedAt: latestReleaseInfo.PublishedAt,
-	}
-
-	return latestVersion, nil
 }
 
 func getReleaseDetails(host string, owner string, repo string, releaseName string) (*gitHubReleaseInfo, error) {

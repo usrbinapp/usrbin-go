@@ -1,5 +1,11 @@
 package usrbin
 
+import (
+	"github.com/usrbinapp/usrbin-go/pkg/github"
+	"github.com/usrbinapp/usrbin-go/pkg/homebrew"
+	"github.com/usrbinapp/usrbin-go/pkg/oci"
+)
+
 // Option is a functional option for configuring the client
 type Option func(*SDK) error
 
@@ -16,7 +22,16 @@ func UsingLogger(logger Logger) Option {
 // to be the source of truth when checking for new updates
 func UsingGitHubUpdateChecker(repo string) Option {
 	return func(sdk *SDK) error {
-		sdk.updateChecker = NewGitHubUpdateChecker(repo)
+		sdk.updateChecker = github.NewGitHubUpdateChecker(repo)
+		return nil
+	}
+}
+
+// UsingOCIUpdateChecker will cause the image passed in
+// to be the source of truth when checking for new updates
+func UsingOCIUpdateChecker(artifact string) Option {
+	return func(sdk *SDK) error {
+		sdk.updateChecker = oci.NewOCIUpdateChecker(artifact)
 		return nil
 	}
 }
@@ -26,7 +41,7 @@ func UsingGitHubUpdateChecker(repo string) Option {
 // using homebrew
 func UsingHomebrewFormula(formula string) Option {
 	return func(sdk *SDK) error {
-		sdk.externalPackageManagers = append(sdk.externalPackageManagers, NewHomebrewExternalPackageManager(formula))
+		sdk.externalPackageManagers = append(sdk.externalPackageManagers, homebrew.NewHomebrewExternalPackageManager(formula))
 		return nil
 	}
 }

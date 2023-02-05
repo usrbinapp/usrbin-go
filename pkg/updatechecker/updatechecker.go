@@ -1,18 +1,33 @@
-package usrbin
+package updatechecker
 
 import (
+	"time"
+
 	"github.com/Masterminds/semver"
 	"github.com/pkg/errors"
 )
+
+type VersionInfo struct {
+	Version    string    `json:"version"`
+	ReleasedAt time.Time `json:"releasedAt"`
+}
+
+type UpdateInfo struct {
+	LatestVersion   string    `json:"latestVersion"`
+	LatestReleaseAt time.Time `json:"latestReleaseAt"`
+
+	CheckedAt *time.Time `json:"checkedAt"`
+
+	CanUpgradeInPlace      bool   `json:"canUpgradeInPlace"`
+	ExternalUpgradeCommand string `json:"externalUpgradeCommand"`
+}
 
 type UpdateChecker interface {
 	GetLatestVersion() (*VersionInfo, error)
 	DownloadVersion(version string, requireChecksumMatch bool) (string, error)
 }
 
-var _ UpdateChecker = (*GitHubUpdateChecker)(nil)
-
-func updateInfoFromVersions(currentVersion string, latestVersion *VersionInfo) (*UpdateInfo, error) {
+func UpdateInfoFromVersions(currentVersion string, latestVersion *VersionInfo) (*UpdateInfo, error) {
 	if latestVersion == nil {
 		return nil, errors.New("latest version is nil")
 	}

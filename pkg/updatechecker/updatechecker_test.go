@@ -1,4 +1,4 @@
-package usrbin
+package updatechecker
 
 import (
 	"reflect"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_updateInfoFromVersions(t *testing.T) {
+func Test_UpdateInfoFromVersions(t *testing.T) {
 	var releasedAt = time.Now()
 
 	tests := []struct {
@@ -61,7 +61,7 @@ func Test_updateInfoFromVersions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := updateInfoFromVersions(tt.currentVersion, tt.latestVersion)
+			got, err := UpdateInfoFromVersions(tt.currentVersion, tt.latestVersion)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return

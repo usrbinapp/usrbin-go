@@ -4,25 +4,11 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/usrbinapp/usrbin-go/pkg/updatechecker"
 )
 
-type VersionInfo struct {
-	Version    string    `json:"version"`
-	ReleasedAt time.Time `json:"releasedAt"`
-}
-
-type UpdateInfo struct {
-	LatestVersion   string    `json:"latestVersion"`
-	LatestReleaseAt time.Time `json:"latestReleaseAt"`
-
-	CheckedAt *time.Time `json:"checkedAt"`
-
-	CanUpgradeInPlace      bool   `json:"canUpgradeInPlace"`
-	ExternalUpgradeCommand string `json:"externalUpgradeCommand"`
-}
-
 // GetUpdateInfo will return the latest version
-func (s SDK) GetUpdateInfo() (*UpdateInfo, error) {
+func (s SDK) GetUpdateInfo() (*updatechecker.UpdateInfo, error) {
 	checkedAt := time.Now()
 
 	latestVersion, err := s.updateChecker.GetLatestVersion()
@@ -34,7 +20,7 @@ func (s SDK) GetUpdateInfo() (*UpdateInfo, error) {
 		return nil, nil
 	}
 
-	updateInfo, err := updateInfoFromVersions(s.version, latestVersion)
+	updateInfo, err := updatechecker.UpdateInfoFromVersions(s.version, latestVersion)
 	if err != nil {
 		return nil, errors.Wrap(err, "update info from versions")
 	}

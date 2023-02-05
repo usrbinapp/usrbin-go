@@ -1,4 +1,4 @@
-package usrbin
+package github
 
 import (
 	"io/ioutil"
