@@ -1,4 +1,4 @@
-package usrbin
+package homebrew
 
 import (
 	"encoding/json"
@@ -6,11 +6,14 @@ import (
 	"os/exec"
 
 	"github.com/pkg/errors"
+	"github.com/usrbinapp/usrbin-go/pkg/pkgmgr"
 )
 
 type HomebrewExternalPackageManager struct {
 	formula string
 }
+
+var _ pkgmgr.ExternalPackageManager = (*HomebrewExternalPackageManager)(nil)
 
 type homebrewInfoOutput struct {
 	Installed []struct {
@@ -18,7 +21,7 @@ type homebrewInfoOutput struct {
 	} `json:"installed"`
 }
 
-func NewHomebrewExternalPackageManager(formula string) ExternalPackageManager {
+func NewHomebrewExternalPackageManager(formula string) pkgmgr.ExternalPackageManager {
 	return HomebrewExternalPackageManager{
 		formula: formula,
 	}
