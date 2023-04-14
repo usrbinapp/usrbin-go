@@ -158,7 +158,7 @@ func downloadAndParseChecksum(url string, assetName string) (string, error) {
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
-		parts := strings.Split(line, " ")
+		parts := strings.Fields(line)
 		if len(parts) == 2 {
 			if strings.HasSuffix(strings.TrimSpace(parts[1]), assetName) {
 				return strings.TrimSpace(parts[0]), nil
