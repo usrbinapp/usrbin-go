@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bufio"
 	"compress/gzip"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -98,10 +99,11 @@ func (c GitHubUpdateChecker) DownloadVersion(version string, requireChecksumMatc
 		return "", errors.Wrap(err, "best asset")
 	}
 
-	archivePath, err := downloadFile(asset.BrowserDownloadURL)
+	archivePath, fileInArchivePath, err := downloadFile(asset.BrowserDownloadURL)
 	if err != nil {
 		return "", errors.Wrap(err, "download file")
 	}
+	defer os.Remove(archivePath)
 
 	checksumAsset, err := checksum(releaseInfo.Assets, asset.Name)
 	if err != nil {
@@ -124,7 +126,7 @@ func (c GitHubUpdateChecker) DownloadVersion(version string, requireChecksumMatc
 		}
 	}
 
-	return archivePath, nil
+	return fileInArchivePath, nil
 }
 
 // GetLatestVersion will return the latest version information from the git repository
@@ -158,7 +160,7 @@ func downloadAndParseChecksum(url string, assetName string) (string, error) {
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
-		parts := strings.Split(line, " ")
+		parts := strings.Fields(line)
 		if len(parts) == 2 {
 			if strings.HasSuffix(strings.TrimSpace(parts[1]), assetName) {
 				return strings.TrimSpace(parts[0]), nil
@@ -170,7 +172,18 @@ func downloadAndParseChecksum(url string, assetName string) (string, error) {
 }
 
 func checksumFile(path string) (string, error) {
-	return "", nil
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
 // checksumAsset will search through the assets and attempt to find the
@@ -245,26 +258,33 @@ func bestAsset(assets []githubAsset, goos string, goarch string) (*githubAsset, 
 	return nil, ErrNoMatchingArchitectures
 }
 
-func downloadFile(url string) (string, error) {
+// downloadFile will return two strings:
+//   - the path to the downloaded file (the archive)
+//   - the path to the file that is probably the binary
+func downloadFile(url string) (string, string, error) {
 	tmpFile, err := ioutil.TempFile("", "usrbin")
 	if err != nil {
-		return "", errors.Wrap(err, "create temp file")
+		return "", "", errors.Wrap(err, "create temp file")
 	}
-	defer os.RemoveAll(tmpFile.Name())
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", errors.Wrap(err, "get file")
+		return "", "", errors.Wrap(err, "get file")
 	}
 
 	defer resp.Body.Close()
 
 	_, err = io.Copy(tmpFile, resp.Body)
 	if err != nil {
-		return "", errors.Wrap(err, "copy file")
+		return "", "", errors.Wrap(err, "copy file")
 	}
 
-	return findProbableFileInWhatMightBeAnArchive(tmpFile.Name())
+	probableFile, err := findProbableFileInWhatMightBeAnArchive(tmpFile.Name())
+	if err != nil {
+		return "", "", errors.Wrap(err, "find probable file")
+	}
+
+	return tmpFile.Name(), probableFile, nil
 }
 
 func findProbableFileInWhatMightBeAnArchive(path string) (string, error) {
