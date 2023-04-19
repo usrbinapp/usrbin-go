@@ -56,7 +56,9 @@ type gitHubReleaseInfo struct {
 	Assets      []githubAsset `json:"assets"`
 }
 
-var ErrReleaseNotFound = errors.New("release not found")
+var (
+	ErrReleaseNotFound = errors.New("release not found")
+)
 
 func NewGitHubUpdateChecker(fqRepo string) updatechecker.UpdateChecker {
 	host := "https://api.github.com"
@@ -134,6 +136,10 @@ func (c GitHubUpdateChecker) GetLatestVersion() (*updatechecker.VersionInfo, err
 	latestReleaseInfo, err := getReleaseDetails(c.host, c.parsedRepo.owner, c.parsedRepo.repo, "latest")
 	if err != nil {
 		return nil, errors.Wrap(err, "get release details")
+	}
+
+	if latestReleaseInfo == nil {
+		return nil, nil
 	}
 
 	latestVersion := &updatechecker.VersionInfo{
@@ -404,6 +410,10 @@ func getReleaseDetails(host string, owner string, repo string, releaseName strin
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusNotFound {
 			return nil, ErrReleaseNotFound
+		}
+
+		if resp.StatusCode == http.StatusForbidden && strings.Contains(resp.Header.Get("X-RateLimit-Remaining"), "0") {
+			return nil, nil // don't make the caller handle this
 		}
 
 		return nil, errors.Errorf("unexpected status code: %d", resp.StatusCode)
