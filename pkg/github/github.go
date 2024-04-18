@@ -235,7 +235,7 @@ func bestAsset(assets []githubAsset, goos string, goarch string) (*githubAsset, 
 
 	// find the most appropriate asset
 	for _, asset := range assets {
-		if asset.State != "uploaded" {
+		if asset.State != "uploaded" || asset.ContentType == "application/octet-stream" {
 			continue
 		}
 

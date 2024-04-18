@@ -145,6 +145,46 @@ func Test_bestAsset(t *testing.T) {
 				BrowserDownloadURL: "https://usrbin.app/foo_linux_amd64",
 			},
 		},
+		{
+			name: "multiple assets, multiple matching, one is binary",
+			assets: []githubAsset{
+				{
+					Name:               "foo_darwin_amd64",
+					State:              "uploaded",
+					BrowserDownloadURL: "https://usrbin.app/foo_darwin_amd64",
+				},
+				{
+					Name:               "foo_linux_arm64",
+					State:              "uploaded",
+					BrowserDownloadURL: "https://usrbin.app/foo_linux_arm64",
+				},
+				{
+					Name:               "foo_linux_amd64",
+					State:              "uploaded",
+					BrowserDownloadURL: "https://usrbin.app/foo_linux_amd64",
+					ContentType:        "application/octet-stream",
+				},
+				{
+					Name:               "foo_linux_amd64.tar.gz",
+					State:              "uploaded",
+					BrowserDownloadURL: "https://usrbin.app/foo_linux_amd64.tar.gz",
+					ContentType:        "application/not-octet-stream",
+				},
+				{
+					Name:               "checksums.txt",
+					State:              "uploaded",
+					BrowserDownloadURL: "https://usrbin.app/checksums.txt",
+				},
+			},
+			goos:   "linux",
+			goarch: "amd64",
+			want: &githubAsset{
+				Name:               "foo_linux_amd64.tar.gz",
+				State:              "uploaded",
+				BrowserDownloadURL: "https://usrbin.app/foo_linux_amd64.tar.gz",
+				ContentType:        "application/not-octet-stream",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
