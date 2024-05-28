@@ -23,7 +23,7 @@ func Test_UpdateInfoFromVersions(t *testing.T) {
 			currentVersion: "1.0.0",
 			latestVersion: &VersionInfo{
 				Version:    "1.0.0",
-				ReleasedAt: releasedAt,
+				ReleasedAt: &releasedAt,
 			},
 			want:    nil,
 			wantErr: false,
@@ -33,7 +33,7 @@ func Test_UpdateInfoFromVersions(t *testing.T) {
 			currentVersion: "v2.0.4",
 			latestVersion: &VersionInfo{
 				Version:    "v2.0.3",
-				ReleasedAt: releasedAt,
+				ReleasedAt: &releasedAt,
 			},
 			want:    nil,
 			wantErr: false,
@@ -43,9 +43,9 @@ func Test_UpdateInfoFromVersions(t *testing.T) {
 			currentVersion: "v2.0.5",
 			latestVersion: &VersionInfo{
 				Version:    "2.0.6",
-				ReleasedAt: releasedAt,
+				ReleasedAt: &releasedAt,
 			},
-			want:    &UpdateInfo{LatestVersion: "2.0.6", LatestReleaseAt: releasedAt, CanUpgradeInPlace: true},
+			want:    &UpdateInfo{LatestVersion: "2.0.6", LatestReleaseAt: &releasedAt, CanUpgradeInPlace: true},
 			wantErr: false,
 		},
 		{
@@ -53,7 +53,7 @@ func Test_UpdateInfoFromVersions(t *testing.T) {
 			currentVersion: "v2.0.5",
 			latestVersion: &VersionInfo{
 				Version:    "2.0.5-rc1",
-				ReleasedAt: releasedAt,
+				ReleasedAt: &releasedAt,
 			},
 			want:    nil,
 			wantErr: false,
