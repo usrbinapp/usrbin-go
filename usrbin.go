@@ -1,6 +1,8 @@
 package usrbin
 
 import (
+	"time"
+
 	"github.com/usrbinapp/usrbin-go/pkg/github"
 	"github.com/usrbinapp/usrbin-go/pkg/homebrew"
 	"github.com/usrbinapp/usrbin-go/pkg/oci"
@@ -46,10 +48,21 @@ func UsingHomebrewFormula(formula string) Option {
 	}
 }
 
+// UsingHttpTimeout will set the timeout for all http requests
+// made by this sdk
+func UsingHttpTimeout(d time.Duration) Option {
+	return func(sdk *SDK) error {
+		sdk.httpTimeout = d
+		return nil
+	}
+}
+
 func New(version string, opts ...Option) (*SDK, error) {
 	sdk := SDK{
 		version: version,
 	}
+
+	sdk.httpTimeout = 10 * time.Second
 
 	if err := sdk.parseOptions(opts); err != nil {
 		return nil, err

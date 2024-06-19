@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver"
 	"github.com/pkg/errors"
@@ -102,7 +103,7 @@ func (c OCIUpdateChecker) DownloadVersion(version string, requireChecksumMatch b
 }
 
 // GetLatestVersion will return the latest version information from the oci repository
-func (c OCIUpdateChecker) GetLatestVersion() (*updatechecker.VersionInfo, error) {
+func (c OCIUpdateChecker) GetLatestVersion(timeout time.Duration) (*updatechecker.VersionInfo, error) {
 	repo, err := remote.NewRepository(c.artifact)
 	if err != nil {
 		return nil, err

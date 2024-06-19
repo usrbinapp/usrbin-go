@@ -11,7 +11,7 @@ import (
 func (s SDK) GetUpdateInfo() (*updatechecker.UpdateInfo, error) {
 	checkedAt := time.Now()
 
-	latestVersion, err := s.updateChecker.GetLatestVersion()
+	latestVersion, err := s.updateChecker.GetLatestVersion(s.httpTimeout)
 	if err != nil {
 		return nil, errors.Wrap(err, "get latest version")
 	}

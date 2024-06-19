@@ -23,7 +23,7 @@ type UpdateInfo struct {
 }
 
 type UpdateChecker interface {
-	GetLatestVersion() (*VersionInfo, error)
+	GetLatestVersion(timeout time.Duration) (*VersionInfo, error)
 	DownloadVersion(version string, requireChecksumMatch bool) (string, error)
 }
 
