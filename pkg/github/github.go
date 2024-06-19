@@ -27,9 +27,12 @@ var (
 	ErrNoAssets                  = errors.New("no assets")
 	ErrChecksumMismatch          = errors.New("checksum mismatch")
 	ErrUnsupportedChecksumFormat = errors.New("unsupported checksum format")
+	ErrTimeoutExceeded           = errors.New("timeout exceeded")
 )
 
 type GitHubUpdateChecker struct {
+	timeout time.Duration
+
 	repo string
 
 	host string
@@ -75,8 +78,9 @@ func NewGitHubUpdateChecker(fqRepo string) updatechecker.UpdateChecker {
 	}
 
 	return GitHubUpdateChecker{
-		repo: repo,
-		host: host,
+		repo:    repo,
+		host:    host,
+		timeout: time.Second * 3, // a default
 		parsedRepo: struct {
 			owner string
 			repo  string
@@ -91,7 +95,7 @@ func NewGitHubUpdateChecker(fqRepo string) updatechecker.UpdateChecker {
 // a path to the extracted file in the archive
 // it's the responsibility of the caller to clean up the extracted file
 func (c GitHubUpdateChecker) DownloadVersion(version string, requireChecksumMatch bool) (string, error) {
-	releaseInfo, err := getReleaseDetails(c.host, c.parsedRepo.owner, c.parsedRepo.repo, version)
+	releaseInfo, err := getReleaseDetails(c.timeout, c.host, c.parsedRepo.owner, c.parsedRepo.repo, version)
 	if err != nil {
 		return "", errors.Wrap(err, "get release details")
 	}
@@ -101,7 +105,7 @@ func (c GitHubUpdateChecker) DownloadVersion(version string, requireChecksumMatc
 		return "", errors.Wrap(err, "best asset")
 	}
 
-	archivePath, fileInArchivePath, err := downloadFile(asset.BrowserDownloadURL)
+	archivePath, fileInArchivePath, err := downloadFile(asset.BrowserDownloadURL, c.timeout)
 	if err != nil {
 		return "", errors.Wrap(err, "download file")
 	}
@@ -113,7 +117,7 @@ func (c GitHubUpdateChecker) DownloadVersion(version string, requireChecksumMatc
 	}
 
 	if checksumAsset != nil {
-		desiredChecksum, err := downloadAndParseChecksum(checksumAsset.BrowserDownloadURL, asset.Name)
+		desiredChecksum, err := downloadAndParseChecksum(c.timeout, checksumAsset.BrowserDownloadURL, asset.Name)
 		if err != nil {
 			return "", errors.Wrap(err, "download and parse checksum")
 		}
@@ -132,8 +136,9 @@ func (c GitHubUpdateChecker) DownloadVersion(version string, requireChecksumMatc
 }
 
 // GetLatestVersion will return the latest version information from the git repository
-func (c GitHubUpdateChecker) GetLatestVersion() (*updatechecker.VersionInfo, error) {
-	latestReleaseInfo, err := getReleaseDetails(c.host, c.parsedRepo.owner, c.parsedRepo.repo, "latest")
+func (c GitHubUpdateChecker) GetLatestVersion(timeout time.Duration) (*updatechecker.VersionInfo, error) {
+	c.timeout = timeout
+	latestReleaseInfo, err := getReleaseDetails(c.timeout, c.host, c.parsedRepo.owner, c.parsedRepo.repo, "latest")
 	if err != nil {
 		return nil, errors.Wrap(err, "get release details")
 	}
@@ -150,13 +155,18 @@ func (c GitHubUpdateChecker) GetLatestVersion() (*updatechecker.VersionInfo, err
 	return latestVersion, nil
 }
 
-func downloadAndParseChecksum(url string, assetName string) (string, error) {
+func downloadAndParseChecksum(timeout time.Duration, url string, assetName string) (string, error) {
 	// download the file
-	resp, err := http.Get(url)
+	httpClient := http.Client{
+		Timeout: timeout,
+	}
+	resp, err := httpClient.Get(url)
 	if err != nil {
+		if os.IsTimeout(err) {
+			return "", ErrTimeoutExceeded
+		}
 		return "", err
 	}
-
 	defer resp.Body.Close()
 
 	// parse the file
@@ -267,17 +277,22 @@ func bestAsset(assets []githubAsset, goos string, goarch string) (*githubAsset, 
 // downloadFile will return two strings:
 //   - the path to the downloaded file (the archive)
 //   - the path to the file that is probably the binary
-func downloadFile(url string) (string, string, error) {
+func downloadFile(url string, timeout time.Duration) (string, string, error) {
 	tmpFile, err := ioutil.TempFile("", "usrbin")
 	if err != nil {
 		return "", "", errors.Wrap(err, "create temp file")
 	}
 
-	resp, err := http.Get(url)
+	httpClient := http.Client{
+		Timeout: timeout,
+	}
+	resp, err := httpClient.Get(url)
 	if err != nil {
+		if os.IsTimeout(err) {
+			return "", "", ErrTimeoutExceeded
+		}
 		return "", "", errors.Wrap(err, "get file")
 	}
-
 	defer resp.Body.Close()
 
 	_, err = io.Copy(tmpFile, resp.Body)
@@ -385,7 +400,7 @@ func isLikelyFile(mode int64, name string, currentExecutableName string) bool {
 	return false
 }
 
-func getReleaseDetails(host string, owner string, repo string, releaseName string) (*gitHubReleaseInfo, error) {
+func getReleaseDetails(timeout time.Duration, host string, owner string, repo string, releaseName string) (*gitHubReleaseInfo, error) {
 	uri := ""
 
 	if releaseName == "latest" {
@@ -401,8 +416,14 @@ func getReleaseDetails(host string, owner string, repo string, releaseName strin
 
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
-	resp, err := http.DefaultClient.Do(req)
+	httpClient := http.Client{
+		Timeout: timeout,
+	}
+	resp, err := httpClient.Do(req)
 	if err != nil {
+		if os.IsTimeout(err) {
+			return nil, ErrTimeoutExceeded
+		}
 		return nil, errors.Wrap(err, "do request")
 	}
 	defer resp.Body.Close()
